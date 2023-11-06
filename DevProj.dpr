@@ -6,8 +6,17 @@ uses
   SysUtils,
   HttpRequest in 'ExtWinHTTP\HttpRequest.pas';
 
+var
+  Client: THttpRequest;
+  Response: TResponse;
+
 begin
-  { TODO -oUser -cConsole Main : Insert code here }
-  Write('teste 1234');
-  Sleep(5000);
+  Client := THttpRequest.Create;
+  Client.URL := 'https://google.com';
+  Client.Headers.Add('Accept','text/css');
+  Response := Client.Execute;
+
+  WriteLn(Response.Status);
+  WriteLn('EOF');
+  Sleep(3000000);
 end.
