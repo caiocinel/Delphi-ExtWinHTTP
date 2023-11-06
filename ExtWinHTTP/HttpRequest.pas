@@ -131,7 +131,12 @@ begin
   _headers := THeaders.Create;
   _status := pObj.Status;
   _body := pObj.ResponseText;
-  _contenttype := Copy(pObj.Getresponseheader('Content-Type'), 1, Pos(';',pObj.Getresponseheader('Content-Type'))-1);
+  try
+    if(Pos('Content-Type',pObj.Getallresponseheaders()) <> 0) then
+      _contenttype := Copy(pObj.Getresponseheader('Content-Type'), 1, Pos(';',pObj.Getresponseheader('Content-Type'))-1);
+  except
+    _contenttype := '';
+  end;
 
   vHeaders := TStringList.Create;
   vHeaders.StrictDelimiter := True;
