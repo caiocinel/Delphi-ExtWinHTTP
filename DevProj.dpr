@@ -12,11 +12,10 @@ var
 
 begin
   Client := THttpRequest.Create;
-  Client.URL := 'https://google.com';
-  Client.Headers.Add('Accept','text/css');
+  Client.URL := 'https://api.myip.com/';
   Response := Client.Execute;
 
-  WriteLn(Response.Status);
+  WriteLn(Client.Response.JSON.S['ip']);
   WriteLn('EOF');
   Sleep(3000000);
 end.

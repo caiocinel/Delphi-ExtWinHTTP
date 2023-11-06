@@ -39,6 +39,8 @@ type
     _queryparams: TQueryString;
     _headers: THeaders;
     _body: string;
+    function _getBodyAsObject: ISuperObject;
+    procedure _setBodyAsObject(const Value: ISuperObject);
   public
     constructor Create;
     property URL: String read _url write _url;
@@ -47,6 +49,7 @@ type
     property QueryParams: TQueryString read _queryparams;
     property Headers: THeaders read _headers;
     property Body: String read _body write _body;
+    property JSON: ISuperObject read _getBodyAsObject write _setBodyAsObject;
 
   end;
 
@@ -63,8 +66,8 @@ type
     constructor Create(pObj: OleVariant);
     property Status: integer read _status;
     property Headers: THeaders read _headers;
-    property AsText: string read _body;
-    property AsObject: ISuperObject read _getBodyAsObject;
+    property Body: string read _body;
+    property JSON: ISuperObject read _getBodyAsObject;
     property IsSuccessStatusCode: boolean read _getSuccessStatusCode;
   end;
 
@@ -241,6 +244,20 @@ end;
 function TResponse._getSuccessStatusCode: boolean;
 begin
   Result := ((Self._status >= 200) and (Self._status <= 299))
+end;
+
+function TRequest._getBodyAsObject: ISuperObject;
+begin
+  try
+    Result := SO(Self._body);
+  except
+    Result := nil;
+  end;
+end;
+
+procedure TRequest._setBodyAsObject(const Value: ISuperObject);
+begin
+  Self._body := Value.AsString;
 end;
 
 end.
