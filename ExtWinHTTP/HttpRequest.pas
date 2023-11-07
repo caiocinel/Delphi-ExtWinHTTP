@@ -39,10 +39,12 @@ type
     _queryparams: TQueryString;
     _headers: THeaders;
     _body: string;
+    _boundary: string;
     function _getBodyAsObject: ISuperObject;
     procedure _setBodyAsObject(const Value: ISuperObject);
   public
     constructor Create;
+    procedure AddFile(pFieldName, pDir, pContentType: String);
     property URL: String read _url write _url;
     property Method: String read _method write _method;
     property ContentType: String read _contenttype write _contenttype;
@@ -115,6 +117,36 @@ begin
   _response := TResponse.Create(_client);
 
   Result := _response;
+end;
+
+procedure TRequest.AddFile(pFieldName, pDir, pContentType: String);
+var
+  vStringStream: TStringStream;
+  vFileStream : TFileStream;
+  vTemp: String;
+begin
+  try
+    vStringStream := TStringStream.Create('');
+    vFileStream := TFileStream.Create(pDir, fmOpenRead);
+    vFileStream.Seek(0, soBeginning);
+    vStringStream.CopyFrom(vFileStream, 0);
+
+    if(Self._boundary = '') then
+      Self._boundary := FormatDateTime('mmddyyhhnnsszzz', Now);
+
+    vTemp := '----------------------------'+Self._boundary+#13#10+
+    'Content-Disposition: form-data; name="'+pFieldName+'"; filename="'+ExtractFileName(vFileStream.FileName)+'"'+#13#10+
+    'Content-Type: '+pContentType+''+#13#10#13#10+
+    vStringStream.DataString+#13#10+
+    '----------------------------'+Self._boundary+'--'+#13#10;
+    Self._body := Self._body + vTemp;
+    Self._contenttype := 'multipart/form-data; boundary=--------------------------'+Self._boundary+#13#10;
+
+    Self.Headers.Add('Content-Length', IntToStr(Length(Self._body)));
+  finally
+    FreeAndNil(vFileStream);
+    FreeAndNil(vStringStream);
+  end;
 end;
 
 constructor TRequest.Create;
