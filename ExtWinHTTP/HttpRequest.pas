@@ -61,6 +61,9 @@ type
     _boundary: string;
     _files: array of TFormFile;
     _fields: array of TFormField;
+    _sendOnly: boolean;
+    function _getBearer: string;
+    procedure _setBearer(const Value: string);
     function _getBodyAsObject: ISuperObject;
     procedure _setBodyAsObject(const Value: ISuperObject);
     procedure _mountMultipartFormData;
@@ -73,11 +76,12 @@ type
     property URL: String read _url write _url;
     property Method: String read _method write _method;
     property ContentType: String read _contenttype write _contenttype;
-    property QueryParams: TQueryString read _queryparams;
-    property Headers: THeaders read _headers;
+    property QueryParams: TQueryString read _queryparams write _queryparams;
+    property Headers: THeaders read _headers write _headers;
+    property Bearer: string read _getBearer write _setBearer;
     property Body: String read _body write _body;
     property JSON: ISuperObject read _getBodyAsObject write _setBodyAsObject;
-
+    property SendOnly: boolean read _sendOnly write _sendOnly;
   end;
 
 type
@@ -94,7 +98,11 @@ type
     property Status: integer read _status;
     property Headers: THeaders read _headers;
     property Body: string read _body;
+    property Text: string read _body;
+    property AsString: string read _body;
     property JSON: ISuperObject read _getBodyAsObject;
+    property O: string read _body;
+    property AsObject: string read _body;
     property IsSuccessStatusCode: boolean read _getSuccessStatusCode;
   end;
 
@@ -106,13 +114,20 @@ type
     _response: TResponse;
   public
     constructor Create;
+    destructor Destroy; override;
     function Execute: TResponse;
     property Response: TResponse read _response write _response;
   end;
+
+function Get(pURL: string; pQueryParams: TQueryString = nil; pHeaders: THeaders = nil): TResponse;
+function Post(pURL: string; pBody: string = ''; pQueryParams: TQueryString = nil; pHeaders: THeaders = nil): TResponse;
+function Put(pURL: string; pBody: string = ''; pQueryParams: TQueryString = nil; pHeaders: THeaders = nil): TResponse;
+function Delete(pURL: string; pBody: string = ''; pQueryParams: TQueryString = nil; pHeaders: THeaders = nil): TResponse;
+  
 implementation
 
 uses
-  Classes, ComObj, ActiveX, StrUtils, SysUtils;
+  Classes, ComObj, ActiveX, StrUtils, SysUtils, Variants;
 
 constructor THttpRequest.Create;
 begin
@@ -120,6 +135,14 @@ begin
   CoInitialize(nil); 
 
   _client := CreateOleObject('WinHttp.WinHttpRequest.5.1');
+end;
+
+destructor THttpRequest.Destroy;
+begin
+  CoUninitialize;
+  _client := Unassigned;
+  FreeAndNil(Self._response);
+  FreeAndNil(Self);
 end;
 
 function THttpRequest.Execute: TResponse;
@@ -132,7 +155,7 @@ begin
   if(Self.Method <> 'GET') then
     Self._mountBody;
 
-  _client.Open(Self.Method, Self.URL + Self.QueryParams.AsString, False);
+  _client.Open(Self.Method, Self.URL + Self.QueryParams.AsString, Self._sendOnly);
 
   for I := 0 to Self.Headers.Count - 1 do
     _client.SetRequestHeader(Self.Headers.Keys[I], Self.Headers.Values[I]);
@@ -141,6 +164,13 @@ begin
     _client.SetRequestHeader('Content-Type', Self.ContentType);
 
   _client.Send(Self.Body);
+
+  if(Self._sendOnly) then
+  begin
+    Self.Destroy;
+    Result := nil;
+    Exit;
+  end;
 
   _response := TResponse.Create(_client);
 
@@ -265,8 +295,8 @@ begin
     Exit;
   end;
 
-  SetLength(_keys, Length(self._keys));
-  SetLength(_values, Length(self._values));
+  SetLength(_keys, Length(self._keys)+1);
+  SetLength(_values, Length(self._values)+1);
 
   _keys[Length(self._keys)-1] := pKey;
   _values[Length(self._values)-1] := pValue;
@@ -286,7 +316,7 @@ begin
 
   for I := 0 to Length(_keys) - 1 do
   begin
-    Result := _keys[I]+'='+_values[I] + '&';
+    Result := Result + _keys[I]+'='+_values[I] + '&';
   end;    
 
   Result := copy(Result, 1, Length(Result) - 1);
@@ -304,6 +334,11 @@ end;
 function TResponse._getSuccessStatusCode: boolean;
 begin
   Result := ((Self._status >= 200) and (Self._status <= 299))
+end;
+
+function TRequest._getBearer: string;
+begin
+  StringReplace(Self.Headers.Get('Authorization'), 'Bearer ', '', [rfReplaceAll]);
 end;
 
 function TRequest._getBodyAsObject: ISuperObject;
@@ -377,13 +412,29 @@ begin
 end;
 
 procedure TRequest._mountUrlEncodedForm;
+var
+  FormField: TFormField;
 begin
+  Self._body := '';
 
+  for FormField in Self._fields do
+    Self._body := FormField._field+'='+FormField._value+'&';
+
+  Self._body := copy(Self._body, 1, Length(Self._body) - 1);
+  
+  Self._contenttype := 'application/x-www-form-urlencoded';
+  Self.Headers.Add('Content-Length', IntToStr(Length(Self._body)));
+end;
+
+procedure TRequest._setBearer(const Value: string);
+begin
+  Self.Headers.Add('Authorization', 'Bearer '+Value);
 end;
 
 procedure TRequest._setBodyAsObject(const Value: ISuperObject);
 begin
   Self._body := Value.AsString;
+  Self._contenttype := 'application/json';
 end;
 
 constructor TFormFile.Create(pField, pDataString, pContentType: string);
@@ -398,5 +449,85 @@ begin
   Self._field := pField;
   Self._value := pValue;
 end;
+
+function Get(pURL: string; pQueryParams: TQueryString = nil; pHeaders: THeaders = nil): TResponse;
+var
+  Req: THttpRequest;
+begin
+  Req := THttpRequest.Create;
+  Req.URL := pURL;
+
+  if(pQueryParams <> nil) then
+    Req.QueryParams := pQueryParams;
+
+  if(pHeaders <> nil) then
+    Req.Headers := pHeaders;
+
+  Result := Req.Execute;
+end;
+
+function Post(pURL: string; pBody: string = ''; pQueryParams: TQueryString = nil; pHeaders: THeaders = nil): TResponse;
+var
+  Req: THttpRequest;
+begin
+  Req := THttpRequest.Create;
+  Req.URL := pURL;
+
+  if(pQueryParams <> nil) then
+    Req.QueryParams := pQueryParams;
+
+  if(pHeaders <> nil) then
+    Req.Headers := pHeaders;
+
+  if(pBody <> '') then
+    Req.Body := pBody;
+
+  Req.Method := 'POST';
+
+  Result := Req.Execute;
+end;
+
+function Put(pURL: string; pBody: string = ''; pQueryParams: TQueryString = nil; pHeaders: THeaders = nil): TResponse;
+var
+  Req: THttpRequest;
+begin
+  Req := THttpRequest.Create;
+  Req.URL := pURL;
+
+  if(pQueryParams <> nil) then
+    Req.QueryParams := pQueryParams;
+
+  if(pHeaders <> nil) then
+    Req.Headers := pHeaders;
+
+  if(pBody <> '') then
+    Req.Body := pBody;
+
+  Req.Method := 'PUT';
+
+  Result := Req.Execute;
+end;
+
+function Delete(pURL: string; pBody: string = ''; pQueryParams: TQueryString = nil; pHeaders: THeaders = nil): TResponse;
+var
+  Req: THttpRequest;
+begin
+  Req := THttpRequest.Create;
+  Req.URL := pURL;
+
+  if(pQueryParams <> nil) then
+    Req.QueryParams := pQueryParams;
+
+  if(pHeaders <> nil) then
+    Req.Headers := pHeaders;
+
+  if(pBody <> '') then
+    Req.Body := pBody;
+
+  Req.Method := 'DELETE';
+
+  Result := Req.Execute;
+end;
+
 
 end.

@@ -4,22 +4,9 @@ program DevProj;
 
 uses
   SysUtils,
-  HttpRequest in 'ExtWinHTTP\HttpRequest.pas', Classes;
-
-var
-  Client: THttpRequest;
-  Response: TResponse;
+  HttpRequest in 'ExtWinHTTP\HttpRequest.pas';
 begin
-  Client := THttpRequest.Create;
-  Client.URL := 'http://localhost:3000/api/others/testMultiPartFormData';
-  
-  Client.Method := 'POST';
-  Client.AddFile('request', 'C:\Users\caioc\Desktop\TestFile.txt', 'text/plain');
-  Client.AddField('teste', 'valor');
-  Response := Client.Execute;
+  Write(HttpRequest.Get('http://localhost:3000/api/others/testMultiPartFormData').JSON.S['campo1']);
 
-  WriteLn(Client.Response.Status);
-  WriteLn('EOF');
-  Sleep(30000);
-  
+  Sleep(90000);                                                                                       
 end.
