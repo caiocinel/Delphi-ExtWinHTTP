@@ -15,6 +15,25 @@ type
   end;
 
 type
+  TFormFile = class
+  private
+    _field: string;
+    _datastring: string;
+    _contenttype: string;
+  public
+    constructor Create(pField, pDataString, pContentType: string);
+  end;
+
+type
+  TFormField = class
+  private
+    _field: string;
+    _value: string;
+  public
+    constructor Create(pField, pValue: string);
+  end;
+
+type
   THeaders = class
   private
     _keys: array of string;
@@ -40,11 +59,17 @@ type
     _headers: THeaders;
     _body: string;
     _boundary: string;
+    _files: array of TFormFile;
+    _fields: array of TFormField;
     function _getBodyAsObject: ISuperObject;
     procedure _setBodyAsObject(const Value: ISuperObject);
+    procedure _mountMultipartFormData;
+    procedure _mountUrlEncodedForm;
+    procedure _mountBody;
   public
     constructor Create;
     procedure AddFile(pFieldName, pDir, pContentType: String);
+    procedure AddField(pFieldName, pValue: String);
     property URL: String read _url write _url;
     property Method: String read _method write _method;
     property ContentType: String read _contenttype write _contenttype;
@@ -104,6 +129,9 @@ begin
   if(Self.Method = '') then
     Self.Method := 'GET';
 
+  if(Self.Method <> 'GET') then
+    Self._mountBody;
+
   _client.Open(Self.Method, Self.URL + Self.QueryParams.AsString, False);
 
   for I := 0 to Self.Headers.Count - 1 do
@@ -119,11 +147,16 @@ begin
   Result := _response;
 end;
 
+procedure TRequest.AddField(pFieldName, pValue: String);
+begin
+  SetLength(_fields, Length(self._fields)+1);
+  _fields[Length(self._fields)-1] := TFormField.Create(pFieldName, pValue);
+end;
+
 procedure TRequest.AddFile(pFieldName, pDir, pContentType: String);
 var
   vStringStream: TStringStream;
-  vFileStream : TFileStream;
-  vTemp: String;
+  vFileStream: TFileStream;
 begin
   try
     vStringStream := TStringStream.Create('');
@@ -131,21 +164,11 @@ begin
     vFileStream.Seek(0, soBeginning);
     vStringStream.CopyFrom(vFileStream, 0);
 
-    if(Self._boundary = '') then
-      Self._boundary := FormatDateTime('mmddyyhhnnsszzz', Now);
-
-    vTemp := '----------------------------'+Self._boundary+#13#10+
-    'Content-Disposition: form-data; name="'+pFieldName+'"; filename="'+ExtractFileName(vFileStream.FileName)+'"'+#13#10+
-    'Content-Type: '+pContentType+''+#13#10#13#10+
-    vStringStream.DataString+#13#10+
-    '----------------------------'+Self._boundary+'--'+#13#10;
-    Self._body := Self._body + vTemp;
-    Self._contenttype := 'multipart/form-data; boundary=--------------------------'+Self._boundary+#13#10;
-
-    Self.Headers.Add('Content-Length', IntToStr(Length(Self._body)));
+    SetLength(_files, Length(self._files)+1);
+    _files[Length(self._files)-1] := TFormFile.Create(pFieldName, vStringStream.DataString, pContentType);
   finally
-    FreeAndNil(vFileStream);
     FreeAndNil(vStringStream);
+    FreeAndNil(vFileStream);
   end;
 end;
 
@@ -292,9 +315,88 @@ begin
   end;
 end;
 
+procedure TRequest._mountBody;
+begin
+  if(Pos('multipart/form-data', self._contenttype) <> 0) then
+  begin
+    Self._mountMultipartFormData;
+    Exit;
+  end;
+
+  if(Pos('x-www-form-urlencoded', self._contenttype) <> 0) then
+  begin
+    Self._mountUrlEncodedForm;
+    Exit;
+  end;
+
+  if(Length(_files) > 0) then
+  begin
+    Self._mountMultipartFormData;
+    Exit;
+  end;
+
+  if(Length(_fields) > 0) then
+  begin
+    Self._mountUrlEncodedForm;
+    Exit;
+  end;    
+end;
+
+procedure TRequest._mountMultipartFormData;
+var
+  vTemp: String;
+  FormFile: TFormFile;
+  FormField: TFormField;
+begin
+  if(Self._boundary = '') then
+    Self._boundary := FormatDateTime('mmddyyhhnnsszzz', Now);
+
+  Self._body := '';
+
+  for FormFile in Self._files do
+  begin
+    vTemp := '----------------------------'+Self._boundary+#13#10+
+    'Content-Disposition: form-data; name="'+FormFile._field+'"; filename="'+FormFile._field+'"'+#13#10+
+    'Content-Type: '+FormFile._contenttype+''+#13#10#13#10+
+    FormFile._datastring+#13#10;
+    Self._body := Self._body + vTemp;
+  end;
+
+  for FormField in Self._fields do
+  begin
+    vTemp := '----------------------------'+Self._boundary+#13#10+
+    'Content-Disposition: form-data; name="'+FormField._field+'"'+#13#10#13#10+
+    FormField._value+#13#10;
+    Self._body := Self._body + vTemp;
+  end;
+
+  Self._body := Self._body + '----------------------------'+Self._boundary+'--'+#13#10;
+
+  Self._contenttype := 'multipart/form-data; boundary=--------------------------'+Self._boundary+#13#10;
+  Self.Headers.Add('Content-Length', IntToStr(Length(Self._body)));
+end;
+
+procedure TRequest._mountUrlEncodedForm;
+begin
+
+end;
+
 procedure TRequest._setBodyAsObject(const Value: ISuperObject);
 begin
   Self._body := Value.AsString;
+end;
+
+constructor TFormFile.Create(pField, pDataString, pContentType: string);
+begin
+  Self._field := pField;
+  Self._datastring := pDataString;
+  Self._contenttype := pContentType;
+end;
+
+constructor TFormField.Create(pField, pValue: string);
+begin
+  Self._field := pField;
+  Self._value := pValue;
 end;
 
 end.

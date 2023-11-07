@@ -15,7 +15,7 @@ begin
   
   Client.Method := 'POST';
   Client.AddFile('request', 'C:\Users\caioc\Desktop\TestFile.txt', 'text/plain');
-  
+  Client.AddField('teste', 'valor');
   Response := Client.Execute;
 
   WriteLn(Client.Response.Status);
