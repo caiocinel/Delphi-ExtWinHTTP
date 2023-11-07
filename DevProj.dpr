@@ -5,8 +5,12 @@ program DevProj;
 uses
   SysUtils,
   HttpRequest in 'ExtWinHTTP\HttpRequest.pas';
-begin
-  Write(HttpRequest.Get('http://localhost:3000/api/others/testMultiPartFormData').JSON.S['campo1']);
 
-  Sleep(90000);                                                                                       
+var
+  Headers: THeaders;
+  Query: TQueryString;
+  Request: THttpRequest;
+  Response: TResponse;
+begin
+  Sleep(30000);
 end.

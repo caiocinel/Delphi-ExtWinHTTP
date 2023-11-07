@@ -62,6 +62,9 @@ type
     _files: array of TFormFile;
     _fields: array of TFormField;
     _sendOnly: boolean;
+    _certificate: string;
+    _timeout: integer;
+    procedure _setCertificate(const Value: string);
     function _getBearer: string;
     procedure _setBearer(const Value: string);
     function _getBodyAsObject: ISuperObject;
@@ -82,6 +85,8 @@ type
     property Body: String read _body write _body;
     property JSON: ISuperObject read _getBodyAsObject write _setBodyAsObject;
     property SendOnly: boolean read _sendOnly write _sendOnly;
+    property Certificate: string read _certificate write _setCertificate;
+    property Timeout: integer read _timeout write _timeout;
   end;
 
 type
@@ -101,8 +106,8 @@ type
     property Text: string read _body;
     property AsString: string read _body;
     property JSON: ISuperObject read _getBodyAsObject;
-    property O: string read _body;
-    property AsObject: string read _body;
+    property O: ISuperObject read _getBodyAsObject;
+    property AsObject: ISuperObject read _getBodyAsObject;
     property IsSuccessStatusCode: boolean read _getSuccessStatusCode;
   end;
 
@@ -142,7 +147,6 @@ begin
   CoUninitialize;
   _client := Unassigned;
   FreeAndNil(Self._response);
-  FreeAndNil(Self);
 end;
 
 function THttpRequest.Execute: TResponse;
@@ -162,6 +166,12 @@ begin
 
   if(Self.ContentType <> '') then
     _client.SetRequestHeader('Content-Type', Self.ContentType);
+
+  if(Self._certificate <> '') then
+    _client.SetClientCertificate(Self._certificate);
+
+  if(Self._timeout <> 0) then
+    _client.SetTimeouts(Self._timeout, Self._timeout, Self._timeout, Self._timeout);
 
   _client.Send(Self.Body);
 
@@ -435,6 +445,16 @@ procedure TRequest._setBodyAsObject(const Value: ISuperObject);
 begin
   Self._body := Value.AsString;
   Self._contenttype := 'application/json';
+end;
+
+procedure TRequest._setCertificate(const Value: string);
+var
+  FilePath: TStringList;
+begin
+  FilePath := TStringList.Create;
+  FilePath.LoadFromFile(Value);
+  Self.Certificate := FilePath.Text;
+  FreeAndNil(FilePath);
 end;
 
 constructor TFormFile.Create(pField, pDataString, pContentType: string);
