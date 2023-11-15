@@ -1,4 +1,4 @@
-# ExtWinHTTP - WinHttpRequest to Legacy Delphi
+# ExtWinHTTP - WinHttpRequest Wrapper to Legacy Delphi Versions
 
 ## Requirements
 
