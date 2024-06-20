@@ -2,7 +2,7 @@ unit HttpRequest;
 
 interface
 
-uses SuperObject;
+uses SuperObject, Classes, AxCtrls;
 
 type
   TQueryString = class
@@ -96,10 +96,12 @@ type
     _body: string;
     _contenttype: string;
     _headers: THeaders;
+    _stream: OleVariant;
     function _getSuccessStatusCode: boolean;
     function _getBodyAsObject: ISuperObject;
   public
     constructor Create(pObj: OleVariant);
+    function SaveToFile(Path: string): boolean;
     property Status: integer read _status;
     property Headers: THeaders read _headers;
     property Body: string read _body;
@@ -132,7 +134,7 @@ function Delete(pURL: string; pBody: string = ''; pQueryParams: TQueryString = n
 implementation
 
 uses
-  Classes, ComObj, ActiveX, StrUtils, SysUtils, Variants;
+  ComObj, ActiveX, StrUtils, SysUtils, Variants;
 
 constructor THttpRequest.Create;
 begin
@@ -226,6 +228,8 @@ begin
   _headers := THeaders.Create;
   _status := pObj.Status;
   _body := pObj.ResponseText;
+  _stream := pObj.ResponseStream;
+
   try
     if(Pos('Content-Type',pObj.Getallresponseheaders()) <> 0) then
       _contenttype := Copy(pObj.Getresponseheader('Content-Type'), 1, Pos(';',pObj.Getresponseheader('Content-Type'))-1);
@@ -327,9 +331,25 @@ begin
   for I := 0 to Length(_keys) - 1 do
   begin
     Result := Result + _keys[I]+'='+_values[I] + '&';
-  end;    
+  end;
 
   Result := copy(Result, 1, Length(Result) - 1);
+end;
+
+function TResponse.SaveToFile(Path: string): boolean;
+var
+  oStream: TStream;
+  mStream: TMemoryStream;
+begin
+  try
+    oStream := TOleStream.Create(IStream(IUnknown(_stream)));
+    mStream := TMemoryStream.Create;
+    mStream.LoadFromStream(oStream);
+    mStream.SaveToFile(Path);
+  finally
+    FreeAndNil(oStream);
+    FreeAndNil(mStream);
+  end;
 end;
 
 function TResponse._getBodyAsObject: ISuperObject;

@@ -12,5 +12,17 @@ var
   Request: THttpRequest;
   Response: TResponse;
 begin
-  Sleep(30000);
+
+  Request := THttpRequest.Create;
+  try
+    Request.URL := 'https://archive.org/download/windows-xp-bliss-4k-lu-3840x2400/windows-xp-bliss-4k-lu-3840x2400.jpg';
+    Request.Execute;
+    Request.Response.SaveToFile('nomeimage.jpg');
+    Request.Destroy;
+
+  except on E:Exception do
+    WriteLn(E.Message);
+  end;
+
+  WriteLn('Fim');
 end.
