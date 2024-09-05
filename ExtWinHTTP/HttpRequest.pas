@@ -2,7 +2,7 @@ unit HttpRequest;
 
 interface
 
-uses SuperObject, Classes, AxCtrls;
+uses XSuperObject, Classes{$if ifndef(VER210ORGREATER)},AxCtls{$ifend};
 
 type
   TQueryString = class
@@ -101,7 +101,7 @@ type
     function _getBodyAsObject: ISuperObject;
   public
     constructor Create(pObj: OleVariant);
-    function SaveToFile(Path: string): boolean;
+    procedure SaveToFile(Path: string);
     property Status: integer read _status;
     property Headers: THeaders read _headers;
     property Body: string read _body;
@@ -336,13 +336,13 @@ begin
   Result := copy(Result, 1, Length(Result) - 1);
 end;
 
-function TResponse.SaveToFile(Path: string): boolean;
+procedure TResponse.SaveToFile(Path: string);
 var
   oStream: TStream;
   mStream: TMemoryStream;
 begin
   try
-    oStream := TOleStream.Create(IStream(IUnknown(_stream)));
+    {$if ifndef(VER210ORGREATER)}oStream := TOleStream.Create(IStream(IUnknown(_stream)));{$ifend}
     mStream := TMemoryStream.Create;
     mStream.LoadFromStream(oStream);
     mStream.SaveToFile(Path);
@@ -463,7 +463,7 @@ end;
 
 procedure TRequest._setBodyAsObject(const Value: ISuperObject);
 begin
-  Self._body := Value.AsString;
+  Self._body := String(Value);
   Self._contenttype := 'application/json';
 end;
 
